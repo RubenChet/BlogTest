@@ -6,7 +6,6 @@ import flask
 from werkzeug.exceptions import abort
 
 from db import get_db
-from auth import login_required
 
 
 bp = flask.Blueprint(  # declare new blueprint
@@ -29,8 +28,8 @@ def index():
     """
     db = get_db()
     posts = db.execute(
-        'SELECT p.id, title, body, created, author_id, username'
-        ' FROM post p JOIN user u ON p.author_id = u.id'
+        'SELECT p.post_id, title, body, created, p.user_id, username'
+        ' FROM post p JOIN user u ON p.user_id = u.user_id'
         ' ORDER BY created DESC'
     ).fetchall()
     return jsonify(posts=[dict(post) for post in posts])
@@ -67,17 +66,20 @@ def index():
 #     return flask.render_template('blog/create.html')
 
 @bp.route('/create', methods=('POST',))
-# @login_required
 def create_post():
     """Insert new post in db when a POST request occurs and return user to index
     page if everything went right, otherwise to the same view.
 
     Returns (json): response in JSON format
     """
-    title = flask.request.json.get('title')
-    body = flask.request.json.get('body')
+    data = flask.request.get_json()
+    title = data.get('title')
+    body = data.get('body')
+    cookie = data.get('cookie')
     error = None
-
+    print(title)
+    print(body)
+    print(cookie)
     if not title:
         error = 'Title is required.'
 
@@ -86,8 +88,8 @@ def create_post():
     else:
         db = get_db()
         db.execute(
-            'INSERT INTO post (title, body, author_id)'
-            f' VALUES ("{title}", "{body}", {flask.g.user["id"]})'
+            'INSERT INTO post (title, body, user_id)'
+            f' VALUES ("{title}", "{body}", "{cookie}")'
         )
         db.commit()
         response = {'status': 'success', 'message': 'Post successfully created.'}
@@ -129,7 +131,6 @@ def get_post(post_id, check_author=True):
 
 
 @bp.route('/update/<int:post_id>', methods=('GET', 'POST'))
-@login_required
 def update(post_id):
     """Blog post update view. Display update form in the same way as the
     creation form. Answer POST update with an update in the database.
@@ -164,7 +165,6 @@ def update(post_id):
 
 
 @bp.route('/delete/<int:post_id>', methods=('POST',))
-@login_required
 def delete(post_id):
     """POST method to delete a post by its id. Silently fails.
 

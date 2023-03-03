@@ -34,11 +34,9 @@ def register():
 
     if error is None:
         try:
-            
-            print(user_id)
             db.execute(
-                'INSERT INTO user (username, password, user_id) VALUES (?, ?, ?)',
-                (username, generate_password_hash(password), user_id)
+                'INSERT INTO user (user_id, username, password) VALUES (?, ?, ?)',
+                (user_id, username, generate_password_hash(password))
             )
             db.commit()
         except db.IntegrityError:  # catch this specific exception
@@ -71,8 +69,7 @@ def login():
     elif not check_password_hash(user['password'], password):
         return flask.jsonify({'status': 'error', 'message': 'Incorrect username or password.'})
 
-    response = flask.jsonify({'status': 'success', 'message': 'Logged in successfully.'})
-    response.set_cookie('user_id', str(user['id']))
+    response = flask.jsonify({'status': 'success', 'message': 'Logged in successfully.', 'cookie' : user['user_id']})
     return response
 
 
@@ -100,17 +97,3 @@ def load_logged_in_user():
         flask.g.user = get_db().execute(
             f'SELECT * FROM user WHERE id = {user_id}'
         ).fetchone()
-
-
-def login_required(view):
-    """Register a view that need authentication. Redirect client to login if
-    they are not authenticated.
-    """
-    @functools.wraps(view)
-    def wrapped_view(**kwargs):
-        if flask.g.user is None:
-            return flask.redirect(flask.url_for('auth.login'))
-
-        return view(**kwargs)
-
-    return wrapped_view

@@ -51,7 +51,7 @@
 					.then((data) => {
 						// handle successful login
 						console.log(data)
-						document.cookie = `user_id=${data.user_id}`
+						document.cookie = `user_id=${data.cookie}`
 					})
 					.catch((error) => {
 						// handle error
