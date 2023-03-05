@@ -34,37 +34,6 @@ def index():
     ).fetchall()
     return jsonify(posts=[dict(post) for post in posts])
 
-
-# @bp.route('/create', methods=('GET', 'POST'))
-# @login_required
-# def create():
-#     """Blog creation view. Answer a GET request with the creation form.
-#     Insert new post in db when a POST request occurs and return user to index
-#     page if everything went right, otherwise to the same view.
-
-#     Returns (str): create view or redirect to index page
-#     """
-#     if flask.request.method == 'POST':
-#         title = flask.request.form['title']
-#         body = flask.request.form['body']
-#         error = None
-
-#         if not title:
-#             error = 'Title is required.'
-
-#         if error is not None:
-#             flask.flash(error, 'error')
-#         else:
-#             db = get_db()
-#             db.execute(
-#                 'INSERT INTO post (title, body, author_id)'
-#                 f' VALUES ("{title}", "{body}", {flask.g.user["id"]})'
-#             )
-#             db.commit()
-#             return flask.redirect(flask.url_for('blog.index'))
-
-#     return flask.render_template('blog/create.html')
-
 @bp.route('/create', methods=('POST',))
 def create_post():
     """Insert new post in db when a POST request occurs and return user to index
