@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Declare a Flask blueprint to register blog views.
 """
-
 import flask
 from werkzeug.exceptions import abort
-
 from db import get_db
-
+from flask import jsonify
 
 bp = flask.Blueprint(  # declare new blueprint
     name='blog',
@@ -14,9 +12,6 @@ bp = flask.Blueprint(  # declare new blueprint
     template_folder='templates',
     url_prefix='/',
 )
-
-
-from flask import jsonify
 
 @bp.route('/')
 def index():
@@ -46,9 +41,6 @@ def create_post():
     body = data.get('body')
     cookie = data.get('cookie')
     error = None
-    print(title)
-    print(body)
-    print(cookie)
     if not title:
         error = 'Title is required.'
 
@@ -65,9 +57,7 @@ def create_post():
 
     return flask.jsonify(response)
 
-
-
-def get_post(post_id, check_author=True):
+def get_post(post_id):
     """Return a blog post from the database from its id.
     If check_author is True, check if the current logged-in user is
     the owner of the post, raising HTTP 403 Forbidden error if they are not.
@@ -85,21 +75,20 @@ def get_post(post_id, check_author=True):
             logged-in user is not author of the post
     """
     post = get_db().execute(
-        'SELECT p.id, title, body, created, author_id, username'
-        ' FROM post p JOIN user u ON p.author_id = u.id'
-        f' WHERE p.id = {post_id}'
+        'SELECT post_id, title, body, created, user_id'
+        ' FROM post'
+        f' WHERE post_id = {post_id}'
     ).fetchone()
 
     if post is None:
         abort(404, f"Post id {post_id} doesn't exist.")
 
-    if check_author and post['author_id'] != flask.g.user['id']:
-        abort(403)
+    # if check_author and post['author_id'] != flask.g.user['id']:
+    #     abort(403)
 
     return post
 
-
-@bp.route('/update/<int:post_id>', methods=('GET', 'POST'))
+@bp.route('/update/<int:post_id>', methods=['PUT'])
 def update(post_id):
     """Blog post update view. Display update form in the same way as the
     creation form. Answer POST update with an update in the database.
@@ -109,31 +98,23 @@ def update(post_id):
 
     Returns: update view or a redirect to the index page
     """
-    post = get_post(post_id)
+    data = flask.request.get_json()
+    title = data.get('title')
+    body = data.get('body')
+    error = None
+    if error is not None:
+        response = {'status': 'error', 'message': error}
+    else:
+        db = get_db()
+        db.execute(
+            f'UPDATE post SET title = "{title}", body = "{body}"'
+            f' WHERE post_id = {post_id}'
+        )
+        db.commit()
+        response = {'status': 'success', 'message': 'Post successfully Updated.'}
+    return jsonify(response)
 
-    if flask.request.method == 'POST':
-        title = flask.request.form['title']
-        body = flask.request.form['body']
-        error = None
-
-        if not title:
-            error = 'Title is required.'
-
-        if error is not None:
-            flask.flash(error, 'error')
-        else:
-            db = get_db()
-            db.execute(
-                f'UPDATE post SET title = "{title}", body = "{body}"'
-                f' WHERE id = {post_id}'
-            )
-            db.commit()
-            return flask.redirect(flask.url_for('blog.index'))
-
-    return flask.render_template('blog/update.html', post=post)
-
-
-@bp.route('/delete/<int:post_id>', methods=('POST',))
+@bp.route('/delete/<int:post_id>',  methods=['DELETE'])
 def delete(post_id):
     """POST method to delete a post by its id. Silently fails.
 
@@ -144,10 +125,10 @@ def delete(post_id):
     """
     get_post(post_id)
     db = get_db()
-    db.execute(f'DELETE FROM post WHERE id = {post_id}')
+    db.execute(f'DELETE FROM post WHERE post_id = {post_id}')
     db.commit()
-    return flask.redirect(flask.url_for('blog.index'))
-
+    response = {'message': 'Post has been deleted'}
+    return jsonify(response)
 
 @bp.route('/detail/<int:post_id>')
 def detail(post_id):
@@ -161,6 +142,5 @@ def detail(post_id):
     Raises:
         werkzeug.exceptions.NotFound: if the post id is not found
     """
-    post = get_post(post_id, check_author=False)
-
-    return flask.render_template('blog/detail.html', post=post)
+    post = get_post(post_id)
+    return jsonify(post=dict(post))

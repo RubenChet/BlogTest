@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Declare a Flask blueprint to register authentication views.
 """
-import functools
 import flask
 from db import get_db
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -71,29 +70,3 @@ def login():
 
     response = flask.jsonify({'status': 'success', 'message': 'Logged in successfully.', 'cookie' : user['user_id']})
     return response
-
-
-
-@bp.route('/logout')
-def logout():
-    """Clear current user cookie.
-
-    Returns: redirect to index page
-    """
-    response = flask.redirect(flask.url_for('index'))
-    response.delete_cookie('user_id')
-    return response
-
-
-@bp.before_app_request
-def load_logged_in_user():
-    """If user is currently connected, attach user object to context.
-    """
-    user_id = flask.request.cookies.get('user_id')
-
-    if user_id is None:
-        flask.g.user = None
-    else:
-        flask.g.user = get_db().execute(
-            f'SELECT * FROM user WHERE id = {user_id}'
-        ).fetchone()

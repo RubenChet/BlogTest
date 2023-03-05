@@ -3,7 +3,6 @@
 Create functions to manage the sqlite db
 """
 import sqlite3
-
 import flask
 import click
 
