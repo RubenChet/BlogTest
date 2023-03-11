@@ -4,7 +4,9 @@
 import flask
 from db import get_db
 from werkzeug.security import generate_password_hash, check_password_hash
-import secrets
+import uuid
+
+sessions_cookies = {} # store the session cookies
 
 bp = flask.Blueprint(  # declare new blueprint
     name='auth',
@@ -22,7 +24,6 @@ def register():
     data = flask.request.get_json()
     username = data.get('username')
     password = data.get('password')
-    user_id = secrets.token_hex(16)
     db = get_db()
     error = None
 
@@ -30,12 +31,12 @@ def register():
         error = 'Username is required.'
     elif not password:
         error = 'Password is required.'
-
+    
     if error is None:
         try:
             db.execute(
-                'INSERT INTO user (user_id, username, password) VALUES (?, ?, ?)',
-                (user_id, username, generate_password_hash(password))
+                'INSERT INTO user (username, password) VALUES (?, ?)',
+                (username, generate_password_hash(password))
             )
             db.commit()
         except db.IntegrityError:  # catch this specific exception
@@ -67,6 +68,16 @@ def login():
         return flask.jsonify({'status': 'error', 'message': 'Incorrect username or password.'})
     elif not check_password_hash(user['password'], password):
         return flask.jsonify({'status': 'error', 'message': 'Incorrect username or password.'})
-
-    response = flask.jsonify({'status': 'success', 'message': 'Logged in successfully.', 'cookie' : user['user_id']})
+    
+    # create a response object
+    response = flask.jsonify({'status': 'success', 'message': 'Logged in successfully.'})
+    # create and set the cookie
+    user_cookie = str(uuid.uuid4())
+    response.set_cookie('sessionId', user_cookie, secure=True, httponly=True, samesite="none")
+    # store the cookie in the sessions_cookies dict
+    sessions_cookies[username] = user_cookie
     return response
+
+@bp.route('/logout', methods=('POST',))
+def logout():
+    print(sessions_cookies)

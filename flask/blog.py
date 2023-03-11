@@ -5,6 +5,8 @@ import flask
 from werkzeug.exceptions import abort
 from db import get_db
 from flask import jsonify
+from auth import sessions_cookies
+
 
 bp = flask.Blueprint(  # declare new blueprint
     name='blog',
@@ -23,8 +25,8 @@ def index():
     """
     db = get_db()
     posts = db.execute(
-        'SELECT p.post_id, title, body, created, p.user_id, username'
-        ' FROM post p JOIN user u ON p.user_id = u.user_id'
+        'SELECT post_id, title, body, created, username'
+        ' FROM post '
         ' ORDER BY created DESC'
     ).fetchall()
     return jsonify(posts=[dict(post) for post in posts])
@@ -39,7 +41,12 @@ def create_post():
     data = flask.request.get_json()
     title = data.get('title')
     body = data.get('body')
-    cookie = data.get('cookie')
+    cookie = flask.request.cookies.get('sessionId')
+    if cookie in sessions_cookies.values():
+        username = [cle for cle, valeur in sessions_cookies.items() if valeur == cookie][0]
+        print(f"Le cookie {cookie} correspond à l'utilisateur {username}")
+    else:
+         return flask.jsonify("La clé", cookie, "n'est pas présente dans le dictionnaire sessions")
     error = None
     if not title:
         error = 'Title is required.'
@@ -49,8 +56,8 @@ def create_post():
     else:
         db = get_db()
         db.execute(
-            'INSERT INTO post (title, body, user_id)'
-            f' VALUES ("{title}", "{body}", "{cookie}")'
+            'INSERT INTO post (title, body, username)'
+            f' VALUES ("{title}", "{body}", "{username}")'
         )
         db.commit()
         response = {'status': 'success', 'message': 'Post successfully created.'}
@@ -75,16 +82,12 @@ def get_post(post_id):
             logged-in user is not author of the post
     """
     post = get_db().execute(
-        'SELECT post_id, title, body, created, user_id'
+        'SELECT post_id, title, body, created, username'
         ' FROM post'
         f' WHERE post_id = {post_id}'
     ).fetchone()
-
-    if post is None:
+    if post is None :
         abort(404, f"Post id {post_id} doesn't exist.")
-
-    # if check_author and post['author_id'] != flask.g.user['id']:
-    #     abort(403)
 
     return post
 
@@ -101,6 +104,11 @@ def update(post_id):
     data = flask.request.get_json()
     title = data.get('title')
     body = data.get('body')
+    cookie = flask.request.cookies.get('sessionId')
+    if cookie in sessions_cookies.values():
+        username = [cle for cle, valeur in sessions_cookies.items() if valeur == cookie][0]
+    else :
+        return flask.jsonify("La clé", cookie, "n'est pas présente dans le dictionnaire sessions")
     error = None
     if error is not None:
         response = {'status': 'error', 'message': error}

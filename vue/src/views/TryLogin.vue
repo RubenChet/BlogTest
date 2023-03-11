@@ -34,8 +34,10 @@
 			login() {
 				fetch("http://localhost:5000/auth/login", {
 					method: "POST",
+					credentials: "include",
 					headers: {
 						"Content-Type": "application/json",
+						"X-CSRFToken": "{{ csrf_token() }}"
 					},
 					body: JSON.stringify({
 						username: this.username,
@@ -51,7 +53,6 @@
 					.then((data) => {
 						// handle successful login
 						console.log(data)
-						document.cookie = `user_id=${data.cookie}`
 					})
 					.catch((error) => {
 						// handle error

@@ -37,6 +37,7 @@
 				}
 				fetch(`http://localhost:5000/update/${postId}`, {
 					method: "PUT",
+					credentials: 'include',
 					body: JSON.stringify(data),
 					headers: {
 						"Content-Type": "application/json",
@@ -49,6 +50,7 @@
 							this.$router.push('/')
 						} else {
 							// afficher une erreur
+							console.log(data)
 						}
 					})
 			},

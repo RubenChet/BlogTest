@@ -16,7 +16,6 @@
 </template>
 
 <script>
-	import VueCookies from 'vue-cookies'
 	export default {
 	  data() {
 	    return {
@@ -28,19 +27,19 @@
 	    submitForm() {
 	      fetch('http://localhost:5000/create', {
 	        method: 'POST',
+			credentials: 'include',
 	        headers: {
 							"Content-Type": "application/json",
 						},
 						body: JSON.stringify({
 							title: this.title,
 							body: this.body,
-							cookie: VueCookies.get('user_id'),
 						}),
 	      })
 	        .then(response => response.json())
 	        .then(data => {
-	          if (data.success) {
-	            alert(data.message);
+	          if (data) {
+	            console.log(data);
 	            this.title = '';
 	            this.body = '';
 	          } else {
