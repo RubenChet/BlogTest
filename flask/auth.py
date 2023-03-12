@@ -3,10 +3,10 @@
 """
 import flask
 from db import get_db
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_bcrypt import generate_password_hash, check_password_hash
 import uuid
 
-sessions_cookies = {} # store the session cookies
+sessions_cookies = {}  # store the session cookies
 
 bp = flask.Blueprint(  # declare new blueprint
     name='auth',
@@ -15,11 +15,47 @@ bp = flask.Blueprint(  # declare new blueprint
     url_prefix='/auth',
 )
 
+
 @bp.route('/register', methods=('POST',))
 def register():
     """Register view. Insert new user in db when a POST request occurs.
 
     Returns (str): JSON response
+    """
+    data = flask.request.get_json()
+    username = data.get('username').lower()
+    password = data.get('password')
+    db = get_db()
+    error = None
+
+    if not username:
+        error = 'Username is required.'
+    elif not password:
+        error = 'Password is required.'
+
+    if error is None:
+        try:
+            db.execute(
+                'INSERT INTO user (username, password) VALUES (?, ?)',
+                (username, generate_password_hash(password))
+            )
+            db.commit()
+        except db.IntegrityError:
+            error = f'User {username} is already registered.'
+
+    if error is None:
+        response = flask.jsonify(
+            {'status': 'success', 'message': 'Successfully registered.'})
+    else:
+        response = flask.jsonify({'status': 'error', 'message': error})
+    return response
+
+
+@bp.route('/login', methods=('POST',))
+def login():
+    """Login view. Handle login requests via JSON payload.
+
+    Returns (json): response object with status and message
     """
     data = flask.request.get_json()
     username = data.get('username')
@@ -31,53 +67,45 @@ def register():
         error = 'Username is required.'
     elif not password:
         error = 'Password is required.'
-    
+
     if error is None:
-        try:
-            db.execute(
-                'INSERT INTO user (username, password) VALUES (?, ?)',
-                (username, generate_password_hash(password))
-            )
-            db.commit()
-        except db.IntegrityError:  # catch this specific exception
-            error = f'User {username} is already registered.'
-        else:  # if no exception happened
-            return flask.jsonify({'message': 'Successfully registered'})
+        user = db.execute(
+            'SELECT * FROM user WHERE username = ?',
+            (username,)
+        ).fetchone()
 
-    return flask.jsonify({'error': error})
+        if user is None:
+            error = 'Incorrect username or password.'
+        elif not check_password_hash(user['password'], password):
+            error = 'Incorrect username or password.'
 
-@bp.route('/login', methods=('POST',))
-def login():
-    """Login view. Handle login requests via JSON payload.
+    if error is None:
+        response = flask.jsonify(
+            {'status': 'success', 'message': 'Logged in successfully.'})
+        user_cookie = str(uuid.uuid4())
 
-    Returns (json): response object with status and message
-    """
-    data = flask.request.json
-    username = data.get('username')
-    password = data.get('password')
-
-    if not username or not password:
-        return flask.jsonify({'status': 'error', 'message': 'Username and password are required.'})
-
-    db = get_db()
-    user = db.execute(
-        f'SELECT * FROM user WHERE username = "{username}"'
-    ).fetchone()
-
-    if user is None:
-        return flask.jsonify({'status': 'error', 'message': 'Incorrect username or password.'})
-    elif not check_password_hash(user['password'], password):
-        return flask.jsonify({'status': 'error', 'message': 'Incorrect username or password.'})
-    
-    # create a response object
-    response = flask.jsonify({'status': 'success', 'message': 'Logged in successfully.'})
-    # create and set the cookie
-    user_cookie = str(uuid.uuid4())
-    response.set_cookie('sessionId', user_cookie, secure=True, httponly=True, samesite="none")
-    # store the cookie in the sessions_cookies dict
-    sessions_cookies[username] = user_cookie
+        # SameSite Strict for CSRF protection
+        # hhtponly to prevent XSS
+        # response.set_cookie('sessionId', user_cookie,
+        #                     secure=True, httponly=True, samesite='Strict', max_age=10) exemple de cookie qui expire dans 10 secondes
+        response.set_cookie('sessionId', user_cookie,
+                            secure=True, httponly=True, samesite='Strict', max_age=86400) # Cookie qui expire dans 24h
+        sessions_cookies[user_cookie] = username
+    else:
+        response = flask.jsonify({'status': 'error', 'message': error})
     return response
+
 
 @bp.route('/logout', methods=('POST',))
 def logout():
-    print(sessions_cookies)
+    """Logout view. Handle logout requests.
+
+    Returns (json): response object with status and message
+    """
+    cookie = flask.request.cookies.get('sessionId')
+    if cookie and cookie in sessions_cookies:
+        del sessions_cookies[cookie]
+    response = flask.jsonify(
+        {'status': 'success', 'message': 'Logged out successfully.'})
+    response.set_cookie('sessionId', '', expires=0)
+    return response

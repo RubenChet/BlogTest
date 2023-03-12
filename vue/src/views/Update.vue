@@ -1,32 +1,51 @@
 <template>
-	<div v-if="selectedPost">
-		<h2>Modifier le post "{{ selectedPost.title }}"</h2>
-		<label for="title">Titre :</label>
-		<input id="title" v-model="selectedPost.title" />
-		<label for="body">Corps :</label>
-		<textarea id="body" v-model="selectedPost.body"></textarea>
-		<button @click="updatePost">Enregistrer</button>
-	</div>
+	<a class="bg-white flex flex-col rounded-2xl border border-gray-100 shadow-2xl sm:p-6 lg:p-8 w-[40%] mx-auto mt-20 just">
+		<h1 class="mx-auto text-3xl">Create a new post</h1>
+		<form @submit.prevent="submitForm" class="mt-10 mx-auto">
+			<div>
+				<span class="p-float-label">
+					<InputText id="Title" v-model="selectedPost.title" />
+					<label for="Title">Title</label>
+				</span>
+			</div>
+			<div class="mt-8">
+				<span class="p-float-label">
+					<Textarea v-model="selectedPost.body" rows="5" cols="30" />
+					<label>Content</label>
+				</span>
+			</div>
+			<div class="flex space-x-2 justify-end mt-5">
+				<Button type="submit" label="Update" severity="info" size="small" @click='updatePost' />
+				<Button label="Cancel" severity="secondary" size="small" @click="$router.push('/')" />
+			</div>
+		</form>
+	</a>
 </template>
 
 <script>
 	export default {
 		data() {
 			return {
-				selectedPost: null,
+				selectedPost: {
+					post_id: null,
+					title: "",
+					body: "",
+					created: "",
+					username: "",
+				},
+				postId: null,
 			}
 		},
 		beforeMount() {
-			const postId = this.$route.params.post_id
-			this.getPostDetails(postId)
+			this.postId = this.$route.params.post_id
+			this.getPostDetails()
 		},
 		methods: {
-			getPostDetails(postId) {
-				fetch(`http://localhost:5000/detail/${postId}`)
+			getPostDetails() {
+				fetch(`http://localhost:5000/detail/${this.postId}`)
 					.then((response) => response.json())
 					.then((data) => {
 						this.selectedPost = data.post
-						console.log(this.selectedPost)
 					})
 			},
 			updatePost() {
@@ -37,7 +56,7 @@
 				}
 				fetch(`http://localhost:5000/update/${postId}`, {
 					method: "PUT",
-					credentials: 'include',
+					credentials: "include",
 					body: JSON.stringify(data),
 					headers: {
 						"Content-Type": "application/json",
@@ -47,7 +66,7 @@
 					.then((data) => {
 						if (data.status === "success") {
 							// rediriger vers la page d'accueil
-							this.$router.push('/')
+							this.$router.push("/")
 						} else {
 							// afficher une erreur
 							console.log(data)

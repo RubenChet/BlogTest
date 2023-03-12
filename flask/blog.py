@@ -15,6 +15,7 @@ bp = flask.Blueprint(  # declare new blueprint
     url_prefix='/',
 )
 
+
 @bp.route('/')
 def index():
     """Index view of the blog, fetch all blog posts and display them from
@@ -25,11 +26,12 @@ def index():
     """
     db = get_db()
     posts = db.execute(
-        'SELECT post_id, title, body, created, username'
+        'SELECT *'
         ' FROM post '
         ' ORDER BY created DESC'
     ).fetchall()
     return jsonify(posts=[dict(post) for post in posts])
+
 
 @bp.route('/create', methods=('POST',))
 def create_post():
@@ -38,58 +40,39 @@ def create_post():
 
     Returns (json): response in JSON format
     """
+    # verify if the user is logged in
+    username = is_user_logged_in()
+    if username == False:
+        return flask.jsonify({'status': 'error', 'message': 'Veuillez vous connecter pour pouvoir créer un post'})
+
+    # get the data from the request
     data = flask.request.get_json()
     title = data.get('title')
     body = data.get('body')
-    cookie = flask.request.cookies.get('sessionId')
-    if cookie in sessions_cookies.values():
-        username = [cle for cle, valeur in sessions_cookies.items() if valeur == cookie][0]
-        print(f"Le cookie {cookie} correspond à l'utilisateur {username}")
-    else:
-         return flask.jsonify("La clé", cookie, "n'est pas présente dans le dictionnaire sessions")
+
+    # check if the data is valid
     error = None
     if not title:
         error = 'Title is required.'
-
+    elif not body:
+        error = 'Body is required.'
     if error is not None:
-        response = {'status': 'error', 'message': error}
-    else:
+        return flask.jsonify({'status': 'error', 'message': error})
+
+    # if the data is valid, insert it in the database
+    try:
         db = get_db()
         db.execute(
             'INSERT INTO post (title, body, username)'
-            f' VALUES ("{title}", "{body}", "{username}")'
+            ' VALUES (?, ?, ?)',
+            (title, body, username)
         )
         db.commit()
-        response = {'status': 'success', 'message': 'Post successfully created.'}
+    except:
+        return flask.jsonify({'status': 'error', 'message': 'Error inserting post into database'})
 
-    return flask.jsonify(response)
+    return flask.jsonify({'status': 'success', 'message': 'Post successfully created.'})
 
-def get_post(post_id):
-    """Return a blog post from the database from its id.
-    If check_author is True, check if the current logged-in user is
-    the owner of the post, raising HTTP 403 Forbidden error if they are not.
-
-    Args:
-        post_id: the post id to fetch
-        check_author (bool): If True, check ownership of the post.
-            Default to True.
-
-    Returns: result from the queryset
-
-    Raises:
-        werkzeug.exceptions.NotFound: if the post id is not found
-        werkzeug.exceptions.Forbidden: if check_author is True and current
-            logged-in user is not author of the post
-    """
-    post = get_db().execute(
-        'SELECT post_id, title, body, created, username'
-        ' FROM post'
-        f' WHERE post_id = {post_id}'
-    ).fetchone()
-    if post is None :
-        abort(404, f"Post id {post_id} doesn't exist.")
-
-    return post
 
 @bp.route('/update/<int:post_id>', methods=['PUT'])
 def update(post_id):
@@ -101,26 +84,41 @@ def update(post_id):
 
     Returns: update view or a redirect to the index page
     """
+
+    # verify if the user is logged in
+    username = is_user_logged_in()
+    if username == False:
+        return flask.jsonify({'status': 'error', 'message': 'Veuillez vous connecter'})
+
+    # verify if the user is the owner of the post
+    check_user = is_user_owner_of_post(post_id, username)
+    if check_user == False:
+        return flask.jsonify({'status': 'error', 'message': 'Le post ne vous appartient pas'})
+
+    # get the data from the request
     data = flask.request.get_json()
     title = data.get('title')
     body = data.get('body')
-    cookie = flask.request.cookies.get('sessionId')
-    if cookie in sessions_cookies.values():
-        username = [cle for cle, valeur in sessions_cookies.items() if valeur == cookie][0]
-    else :
-        return flask.jsonify("La clé", cookie, "n'est pas présente dans le dictionnaire sessions")
+
+    # check if the data is valid
     error = None
+    if not title:
+        error = 'Title is required.'
+    elif not body:
+        error = 'Body is required.'
     if error is not None:
-        response = {'status': 'error', 'message': error}
-    else:
-        db = get_db()
-        db.execute(
-            f'UPDATE post SET title = "{title}", body = "{body}"'
-            f' WHERE post_id = {post_id}'
-        )
-        db.commit()
-        response = {'status': 'success', 'message': 'Post successfully Updated.'}
-    return jsonify(response)
+        return jsonify({'status': 'error', 'message': error})
+
+    # if the data is valid, update it in the database
+    db = get_db()
+    db.execute(
+        'UPDATE post SET title = ?, body = ? WHERE post_id = ?',
+        (title, body, post_id)
+    )
+    db.commit()
+
+    return jsonify({'status': 'success', 'message': 'Post successfully updated.'})
+
 
 @bp.route('/delete/<int:post_id>',  methods=['DELETE'])
 def delete(post_id):
@@ -131,12 +129,22 @@ def delete(post_id):
 
     Returns: redirect to the index view
     """
-    get_post(post_id)
+    # verify if the user is logged in
+    username = is_user_logged_in()
+    if username == False:
+        return flask.jsonify({'status': 'error', 'message': 'Veuillez vous connecter'})
+
+    # verify if the user is the owner of the post
+    check_user = is_user_owner_of_post(post_id, username)
+    if check_user == False:
+        return flask.jsonify("Vous ne pouvez pas supprimer un post qui ne vous appartient pas")
+
+    # delete the post
     db = get_db()
-    db.execute(f'DELETE FROM post WHERE post_id = {post_id}')
+    db.execute('DELETE FROM post WHERE post_id = ?', (post_id,))
     db.commit()
-    response = {'message': 'Post has been deleted'}
-    return jsonify(response)
+    return jsonify({'status': 'success', 'message': 'Post has been deleted'})
+
 
 @bp.route('/detail/<int:post_id>')
 def detail(post_id):
@@ -150,5 +158,73 @@ def detail(post_id):
     Raises:
         werkzeug.exceptions.NotFound: if the post id is not found
     """
-    post = get_post(post_id)
+
+    # get the post from the database
+    post = get_db().execute(
+        'SELECT *'
+        ' FROM post'
+        ' WHERE post_id = ?',
+        (post_id,)
+    ).fetchone()
+    if post is None:
+        abort(404, f"Post id {post_id} doesn't exist.")
+
     return jsonify(post=dict(post))
+
+
+@bp.route('/check_id_and_user', methods=['POST'])
+def check_id_and_user():
+    """
+    """
+    data = flask.request.get_json()
+    id = data.get('id')
+    username = is_user_logged_in()
+    if username == False:
+        return flask.jsonify({'status': 'error', 'message': 'Veuillez vous connecter'})
+    check_user = is_user_owner_of_post(id, username)
+    if check_user == False:
+        return flask.jsonify({'status': 'error'})
+    return jsonify({'status': 'success'})
+
+# Function checking if the user is connected
+
+
+def is_user_logged_in():
+    """Check if the user is logged in by verifying if the sessionId cookie is
+    present and valid.
+
+    Returns:
+        Username if the user is logged in, False otherwise
+    """
+    cookie = flask.request.cookies.get('sessionId')
+    if cookie in sessions_cookies:
+        username = sessions_cookies[cookie]
+        return username
+    return False
+
+# Function checking if the user is the owner of the post
+
+
+def is_user_owner_of_post(post_id, username):
+    """Check if the user is the owner of the post with the given post_id.
+
+    Args:
+        post_id: the id of the post to check ownership
+        username: the username of the user to check
+
+    Returns:
+        True if the user is the owner of the post, False otherwise
+    """
+    # check if the user is the owner of the post
+    db = get_db()
+    try:
+        result = db.execute(
+            'SELECT * FROM post WHERE post_id = ?',
+            (post_id,)
+        ).fetchone()
+    except:
+        return False
+    if result and result['username'] == username:
+        return True
+    else:
+        return False
