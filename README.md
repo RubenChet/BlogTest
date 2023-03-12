@@ -1,18 +1,18 @@
-# My glorious blog
-
-One small project of a web blog.
-
+# Glorious Blog
+![Vue.js](https://img.shields.io/badge/vuejs-%2335495e.svg?style=for-the-badge&logo=vuedotjs&logoColor=%234FC08D) ![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white) ![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white) ![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
+Small project of a web blog.
+Backend made with flask
+Frontend made with vue.js
 ## Installation
-
-### Clone the repository
-
 Clone this repository in your personal directory with the command:
 
 ```bash
-git clone https://github.com/cseijido-esaip/glorious-blog.git
+git clone https://github.com/RubenChet/Esaip-Groupe-Violet.git
 ```
+>  **Important**
+Requires [Node.js] and [Python]
 
-### Create a new virtual environment
+### You can create a new virtual environment
 
 On Linux or MacOS
 
@@ -38,16 +38,17 @@ Install needed packages with:
 pip install -r requirements.txt
 ```
 
-List of direct dependencies:
-
-- flask
+```bash
+cd vue
+npm install
+```
 
 ### Initialize project
 
 Run this command once to initialize the project:
 
 ```bash
-flask --app src/app.py init-db
+flask --app flask/app.py init-db
 ```
 
 ## Running the program
@@ -55,13 +56,10 @@ flask --app src/app.py init-db
 Execute one of the following command to start the program:
 
 ```bash
-python src/main.py
+python flask/app.py
 ```
 
 ```bash
-python --app src/app.py --debug run
+cd vue
+npm run dev
 ```
-
-## WARNING
-
-This project contains intentional web vulnerabilities. Do not use it as a real web application in your production environment. Use it for educational purposes only.
