@@ -14,7 +14,10 @@
 	export default {
 		data() {
 			return {
-				selectedPost: null,
+				selectedPost: {
+					title: "",
+					body: "",
+				},
 			}
 		},
 		beforeMount() {
@@ -27,7 +30,6 @@
 					.then((response) => response.json())
 					.then((data) => {
 						this.selectedPost = data.post
-						console.log(data.is_author)
 					})
 			},
 		},
